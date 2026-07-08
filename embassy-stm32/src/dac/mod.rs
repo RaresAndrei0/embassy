@@ -336,27 +336,36 @@ impl<'d> DacChannel<'d, Async> {
             w.set_dmaen(self.idx, false);
         });
     }
-}
 
     #[cfg(gpdma)]
-    pub async fn write<'a, 'ch: 'a, D:TxDma<T>>(
-    &mut self,
-    tx_dma: embassy_hal_internal::Peri<'a, D>,
-    irq: impl crate::interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'a,
-    buffer: &[u16],
-    ) {
-    let _scoped_wake_guard = <T as crate::rcc::SealedRccPeripheral>::RCC_INFO.wake_guard();
+    pub async fn write<W: Word + crate::dma::word::Word>(&mut self, buffer: &[W], circular: bool) {
+        let _scoped_wake_guard = self.info.rcc.wake_guard();
 
-    let request = tx_dma.request();
-    let mut dma_channel = crate::dma::Channel::new(tx_dma, irq);
-    let transfer = unsafe{
-        dma_channel.write(request, buffer, T::regs().set_dmaen(), Default::default())
-    };
+        let dma = self.dma.as_mut().unwrap();
 
-    let _stop_dac = OnDrop::new(|| T:regs().stop());
-    T::regs().start();
+        let tx_options = crate::dma::TransferOptions {
+            half_transfer_ir: false,
+            complete_transfer_ir: !circular,
+            ..Default::default()
+        };
 
-    transfer.await;
+        let tx_dst = W::dma_ptr(self.info.regs, self.idx) as *mut W;
+        let tx_f = unsafe { dma.write(buffer, tx_dst, tx_options) };
+
+        let _stop_dac = embassy_hal_internal::drop::OnDrop::new(|| {
+            self.info.regs.cr().modify(|w| {
+                w.set_en(self.idx, false);
+                w.set_dmaen(self.idx, false);
+            });
+        });
+
+        self.info.regs.cr().modify(|w| {
+            w.set_en(self.idx, true);
+            w.set_dmaen(self.idx, true);
+        });
+
+        tx_f.await;
+    }
 }
 
 impl<'d> DacChannel<'d, Blocking> {
