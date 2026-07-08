@@ -338,6 +338,27 @@ impl<'d> DacChannel<'d, Async> {
     }
 }
 
+    #[cfg(gpdma)]
+    pub async fn write<'a, 'ch: 'a, D:TxDma<T>>(
+    &mut self,
+    tx_dma: embassy_hal_internal::Peri<'a, D>,
+    irq: impl crate::interrupt::typelevel::Binding<D::Interrupt, crate::dma::InterruptHandler<D>> + 'a,
+    buffer: &[u16],
+    ) {
+    let _scoped_wake_guard = <T as crate::rcc::SealedRccPeripheral>::RCC_INFO.wake_guard();
+
+    let request = tx_dma.request();
+    let mut dma_channel = crate::dma::Channel::new(tx_dma, irq);
+    let transfer = unsafe{
+        dma_channel.write(request, buffer, T::regs().set_dmaen(), Default::default())
+    };
+
+    let _stop_dac = OnDrop::new(|| T:regs().stop());
+    T::regs().start();
+
+    transfer.await;
+}
+
 impl<'d> DacChannel<'d, Blocking> {
     /// Create a new `DacChannel` instance, consuming the underlying DAC peripheral.
     ///
