@@ -5,8 +5,11 @@ use embassy_executor::Spawner;
 use embassy_stm32::bind_interrupts;
 use embassy_stm32::dac::DacChannel;
 use embassy_stm32::dma;
+use embassy_stm32::pac;
+use embassy_stm32::pac::i2c::vals::Reload;
 use embassy_stm32::peripherals::GPDMA1_CH0;
 use embassy_stm32::rcc::{LsConfig, mux};
+use embassy_stm32::timer::low_level::RoundTo::Faster;
 use embassy_stm32::{Config, peripherals};
 use embassy_time::Timer;
 use {defmt_rtt as _, panic_probe as _};
@@ -33,11 +36,19 @@ async fn main(_spawner: Spawner) {
     info!("Board connected!");
 
     let mut dac = DacChannel::new(p.DAC1, p.GPDMA1_CH0, Irqs, p.PA4);
+    info!("Dac created!");
 
-    dac.write(&[0, 10, 50, 100, 200], true).await;
-    defmt::info!("transfer started");
+    let mut timer = embassy_stm32::timer::low_level::Timer::new(p.TIM6);
+    timer.set_frequency(embassy_stm32::time::Hertz(41000), Faster);
+    pac::TIM6
+        .cr2()
+        .modify(|w| w.set_mms(embassy_stm32::pac::timer::vals::Mms::Update));
+    timer.start();
 
     loop {
-        Timer::after_millis(5000).await;
+        dac.write(&[200]).await;
+
+        info!("transfer started");
+        Timer::after_millis(1000).await;
     }
 }
