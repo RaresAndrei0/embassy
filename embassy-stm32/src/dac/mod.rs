@@ -349,22 +349,12 @@ impl<'d> DacChannel<'d, Async> {
         });
 
         let dma = self.dma.as_mut().unwrap();
-        let tx_options = crate::dma::TransferOptions {
-            //packing: crate::dma::vals::Pam::ZeroExtendOrLeftTruncate::0,
-            ..Default::default()
-        };
-        //let tx_dst = 0x4602_1808 as *mut W::Word;
+        let tx_options = crate::dma::TransferOptions { ..Default::default() };
         let tx_dst = W::dma_ptr(self.info.regs, self.idx);
+
         let tx_f = unsafe { dma.write_raw(W::dma_buf(buffer), tx_dst, tx_options) };
-        info!("TransferCheck1");
+
         tx_f.await;
-        info!("TransferDone");
-        /*
-                self.info.regs.cr().modify(|w| {
-                    w.set_en(self.idx, false);
-                    w.set_dmaen(self.idx, false);
-                });
-        */
     }
 }
 

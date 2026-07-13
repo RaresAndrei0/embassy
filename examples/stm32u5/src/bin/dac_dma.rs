@@ -18,12 +18,6 @@ bind_interrupts!(struct Irqs {
     GPDMA1_CHANNEL0 => dma::InterruptHandler<GPDMA1_CH0>;
 });
 
-const RAMP_WAVE: [u16; 41] = [
-    0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000,
-    2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3100, 3200, 3300, 3400, 3500, 3600, 3700, 3800, 3900,
-    4000,
-];
-
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     info!("Device has started");
@@ -36,24 +30,22 @@ async fn main(_spawner: Spawner) {
     info!("Board connected!");
 
     let mut dac = DacChannel::new(p.DAC1, p.GPDMA1_CH0, Irqs, p.PA4);
-    info!("Dac created!");
 
     embassy_stm32::rcc::enable_and_reset::<embassy_stm32::peripherals::TIM6>();
 
+    // The timer is needed such that the DMA knows when to "fire"
     let mut timer = embassy_stm32::timer::low_level::Timer::new(p.TIM6);
     timer.set_frequency(embassy_stm32::time::Hertz(41000), Faster);
+
     pac::TIM6
         .cr2()
         .modify(|w| w.set_mms(embassy_stm32::pac::timer::vals::Mms::Update));
+
     timer.start();
 
     let mut i = 0;
     loop {
-        info!("transfer started");
-
         dac.write(&[i; 200]).await;
         i = i.wrapping_add(1);
-
-        //Timer::after_millis(1000).await;
     }
 }
