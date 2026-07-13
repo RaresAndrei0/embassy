@@ -338,26 +338,33 @@ impl<'d> DacChannel<'d, Async> {
     }
 
     #[cfg(gpdma)]
-    pub async fn write<W: Word + crate::dma::word::Word>(&mut self, buffer: &[W]) {
+    pub async fn write<W: Word>(&mut self, buffer: &[W]) {
         let _scoped_wake_guard = self.info.rcc.wake_guard();
 
         self.info.regs.cr().modify(|w| {
+            w.set_tsel(self.idx, 5);
+            w.set_ten(self.idx, true);
             w.set_en(self.idx, true);
             w.set_dmaen(self.idx, true);
         });
 
         let dma = self.dma.as_mut().unwrap();
-        let tx_options = crate::dma::TransferOptions { ..Default::default() };
-        // let tx_dst = 0x4602_1808 as *mut W;
-        let tx_dst = W::dma_ptr(self.info.regs, self.idx) as *mut W;
-        let tx_f = unsafe { dma.write(buffer, tx_dst, tx_options) };
+        let tx_options = crate::dma::TransferOptions {
+            //packing: crate::dma::vals::Pam::ZeroExtendOrLeftTruncate::0,
+            ..Default::default()
+        };
+        //let tx_dst = 0x4602_1808 as *mut W::Word;
+        let tx_dst = W::dma_ptr(self.info.regs, self.idx);
+        let tx_f = unsafe { dma.write_raw(W::dma_buf(buffer), tx_dst, tx_options) };
         info!("TransferCheck1");
         tx_f.await;
         info!("TransferDone");
-        self.info.regs.cr().modify(|w| {
-            w.set_en(self.idx, true);
-            w.set_dmaen(self.idx, true);
-        });
+        /*
+                self.info.regs.cr().modify(|w| {
+                    w.set_en(self.idx, false);
+                    w.set_dmaen(self.idx, false);
+                });
+        */
     }
 }
 

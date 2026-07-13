@@ -38,6 +38,8 @@ async fn main(_spawner: Spawner) {
     let mut dac = DacChannel::new(p.DAC1, p.GPDMA1_CH0, Irqs, p.PA4);
     info!("Dac created!");
 
+    embassy_stm32::rcc::enable_and_reset::<embassy_stm32::peripherals::TIM6>();
+
     let mut timer = embassy_stm32::timer::low_level::Timer::new(p.TIM6);
     timer.set_frequency(embassy_stm32::time::Hertz(41000), Faster);
     pac::TIM6
@@ -45,10 +47,13 @@ async fn main(_spawner: Spawner) {
         .modify(|w| w.set_mms(embassy_stm32::pac::timer::vals::Mms::Update));
     timer.start();
 
+    let mut i = 0;
     loop {
-        dac.write(&[200]).await;
-
         info!("transfer started");
-        Timer::after_millis(1000).await;
+
+        dac.write(&[i; 200]).await;
+        i = i.wrapping_add(1);
+
+        //Timer::after_millis(1000).await;
     }
 }
