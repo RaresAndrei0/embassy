@@ -2,16 +2,14 @@
 #![no_main]
 use defmt::*;
 use embassy_executor::Spawner;
+use embassy_stm32::Config;
 use embassy_stm32::bind_interrupts;
 use embassy_stm32::dac::DacChannel;
 use embassy_stm32::dma;
 use embassy_stm32::pac;
-use embassy_stm32::pac::i2c::vals::Reload;
 use embassy_stm32::peripherals::GPDMA1_CH0;
 use embassy_stm32::rcc::{LsConfig, mux};
 use embassy_stm32::timer::low_level::RoundTo::Faster;
-use embassy_stm32::{Config, peripherals};
-use embassy_time::Timer;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
@@ -34,7 +32,7 @@ async fn main(_spawner: Spawner) {
     embassy_stm32::rcc::enable_and_reset::<embassy_stm32::peripherals::TIM6>();
 
     // The timer is needed such that the DMA knows when to "fire"
-    let mut timer = embassy_stm32::timer::low_level::Timer::new(p.TIM6);
+    let timer = embassy_stm32::timer::low_level::Timer::new(p.TIM6);
     timer.set_frequency(embassy_stm32::time::Hertz(41000), Faster);
 
     pac::TIM6
