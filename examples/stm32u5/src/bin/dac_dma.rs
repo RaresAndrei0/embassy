@@ -10,6 +10,7 @@ use embassy_stm32::pac;
 use embassy_stm32::peripherals::GPDMA1_CH0;
 use embassy_stm32::rcc::{LsConfig, mux};
 use embassy_stm32::timer::low_level::RoundTo::Faster;
+use embassy_stm32::triggers::TIM6_TRGO;
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
@@ -27,7 +28,7 @@ async fn main(_spawner: Spawner) {
 
     info!("Board connected!");
 
-    let mut dac = DacChannel::new(p.DAC1, p.GPDMA1_CH0, Irqs, p.PA4);
+    let mut dac = DacChannel::new_triggered(p.DAC1, p.GPDMA1_CH0, TIM6_TRGO, Irqs, p.PA4);
 
     embassy_stm32::rcc::enable_and_reset::<embassy_stm32::peripherals::TIM6>();
 
@@ -42,6 +43,7 @@ async fn main(_spawner: Spawner) {
     timer.start();
 
     let mut i = 0;
+
     loop {
         dac.write(&[i; 200]).await;
         i = i.wrapping_add(1);
